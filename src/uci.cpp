@@ -43,6 +43,28 @@ namespace {
   // FEN string of the initial position, normal chess
   const char* StartFEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
+  inline Move parse_move(istringstream& input, const Position& position)
+  {
+      string token;
+      input >> token;
+      return UCI::to_move(position, token);
+  }
+
+  inline void add_move(Move move, Position& position, StateListPtr& states)
+  {
+      states->emplace_back();
+      position.do_move(move, states->back());
+  }
+
+  ostream& list_moves(Position& position, ostream& stream)
+  {
+      bool chess960 = Options["UCI_Chess960"];
+      for (const auto& m : MoveList<LEGAL>(position))
+      {
+          stream << UCI::move(m, chess960) << " ";
+      }
+      return stream;
+  }
 
   // position() is called when engine receives the "position" UCI command.
   // The function sets up the position described in the given FEN string ("fen")
@@ -263,7 +285,6 @@ void UCI::loop(int argc, char* argv[]) {
           sync_cout << "id name " << engine_info(true)
                     << "\n"       << Options
                     << "\nuciok"  << sync_endl;
-
       else if (token == "setoption")  setoption(is);
       else if (token == "go")         go(pos, is, states);
       else if (token == "position")   position(pos, is, states);
@@ -277,6 +298,11 @@ void UCI::loop(int argc, char* argv[]) {
       else if (token == "d")        sync_cout << pos << sync_endl;
       else if (token == "eval")     trace_eval(pos);
       else if (token == "compiler") sync_cout << compiler_info() << sync_endl;
+      
+      // Custom commands for retrieving legal moves
+      else if (token == "move") add_move(parse_move(is, pos), pos, states);
+      else if (token == "list") list_moves(pos, sync_cout) << sync_endl;
+      
       else if (!token.empty() && token[0] != '#')
           sync_cout << "Unknown command: " << cmd << sync_endl;
 
